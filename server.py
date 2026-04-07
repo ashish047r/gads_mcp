@@ -389,3 +389,4 @@ if __name__ == "__main__":
     else:
         logger.info("Starting STDIO transport (Claude Desktop mode)")
         mcp.run(transport="stdio")
+

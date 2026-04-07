@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google Ads Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+
+    /* Navbar */
+    .navbar { background: #1a73e8; padding: 12px 24px; }
+    .navbar-brand { color: #fff !important; font-weight: 700; font-size: 1.2rem; }
+    .navbar .user-info { color: rgba(255,255,255,0.9); font-size: 0.9rem; }
+    .navbar .btn-logout {
+      color: #fff; border: 1px solid rgba(255,255,255,0.5);
+      padding: 4px 14px; border-radius: 6px; font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .navbar .btn-logout:hover { background: rgba(255,255,255,0.15); }
+
+    /* Filter bar */
+    .filter-bar {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .filter-bar label { font-size: 0.85rem; font-weight: 600; color: #555; margin: 0; }
+    .filter-bar input[type=date] {
+      border: 1px solid #ccc; border-radius: 6px;
+      padding: 5px 10px; font-size: 0.875rem;
+    }
+    .btn-apply {
+      background: #1a73e8; color: #fff; border: none;
+      border-radius: 6px; padding: 6px 18px; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-apply:hover { background: #1558b0; }
+    .preset-btns button {
+      background: #f1f3f4; border: 1px solid #dadce0;
+      border-radius: 6px; padding: 4px 12px; font-size: 0.8rem;
+      cursor: pointer; color: #444;
+    }
+    .preset-btns button:hover { background: #e8eaed; }
+
+    /* Summary cards */
+    .summary-cards { display: flex; gap: 16px; padding: 20px 24px; flex-wrap: wrap; }
+    .stat-card {
+      background: #fff; border-radius: 10px; padding: 18px 24px;
+      flex: 1; min-width: 160px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+    .stat-card .label { font-size: 0.8rem; color: #888; font-weight: 600; text-transform: uppercase; }
+    .stat-card .value { font-size: 1.8rem; font-weight: 700; color: #202124; margin-top: 4px; }
+    .stat-card .value.blue  { color: #1a73e8; }
+    .stat-card .value.green { color: #0d9c53; }
+    .stat-card .value.orange{ color: #e37400; }
+
+    /* Table */
+    .table-wrapper { padding: 0 24px 32px; }
+    .table-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07); overflow: hidden;
+    }
+    .table-card .table-header {
+      padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .table-card .table-header h6 { margin: 0; font-weight: 700; color: #202124; }
+    .table-card .table-header .row-count { font-size: 0.8rem; color: #888; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead th {
+      background: #f8f9fa; padding: 10px 16px;
+      text-align: left; font-weight: 600; color: #555;
+      border-bottom: 2px solid #e9ecef;
+      cursor: pointer; user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { background: #e9ecef; }
+    thead th.sort-asc::after  { content: " ▲"; font-size: 0.7rem; }
+    thead th.sort-desc::after { content: " ▼"; font-size: 0.7rem; }
+    tbody tr:hover { background: #f8f9fa; }
+    tbody td { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; color: #333; }
+    tbody tr:last-child td { border-bottom: none; }
+    .account-badge {
+      display: inline-block; background: #e8f0fe; color: #1a73e8;
+      border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600;
+    }
+    .ctr-bar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ctr-bar .bar-bg {
+      flex: 1; background: #f0f0f0; border-radius: 4px; height: 6px; max-width: 80px;
+    }
+    .ctr-bar .bar-fill {
+      background: #1a73e8; border-radius: 4px; height: 6px;
+    }
+
+    /* Spinner */
+    .loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(255,255,255,0.7); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .loading-overlay.active { display: flex; }
+
+    /* Search */
+    .table-search {
+      border: 1px solid #dadce0; border-radius: 6px;
+      padding: 5px 12px; font-size: 0.85rem; width: 220px;
+    }
+
+    /* Error banner */
+    .error-banner { display:none; margin: 0 24px 12px; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar d-flex justify-content-between">
+  <span class="navbar-brand">📊 Google Ads Dashboard</span>
+  <div class="d-flex align-items-center gap-3">
+    <span class="user-info">👤 {{ username }}</span>
+    <a href="/logout" class="btn-logout">Sign out</a>
+  </div>
+</nav>
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <label>Date Range:</label>
+  <input type="date" id="startDate" />
+  <span style="color:#888">to</span>
+  <input type="date" id="endDate" />
+  <button class="btn-apply" onclick="applyFilter()">Apply</button>
+  <div class="preset-btns d-flex gap-2 ms-2">
+    <button onclick="setPreset(7)">Last 7 days</button>
+    <button onclick="setPreset(30)">Last 30 days</button>
+    <button onclick="setPreset(90)">Last 90 days</button>
+  </div>
+  <span id="lastUpdated" style="margin-left:auto; font-size:0.8rem; color:#888;"></span>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-cards">
+  <div class="stat-card">
+    <div class="label">Total Impressions</div>
+    <div class="value blue" id="totalImpressions">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Clicks</div>
+    <div class="value green" id="totalClicks">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Avg. CTR</div>
+    <div class="value orange" id="avgCtr">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Spend</div>
+    <div class="value" id="totalCost">—</div>
+  </div>
+  {% if is_admin %}
+  <div class="stat-card">
+    <div class="label">Accounts</div>
+    <div class="value" id="totalAccounts">—</div>
+  </div>
+  {% endif %}
+  <div class="stat-card">
+    <div class="label">Campaigns</div>
+    <div class="value" id="totalCampaigns">—</div>
+  </div>
+</div>
+
+<!-- Error banner -->
+<div class="error-banner alert alert-warning" id="errorBanner"></div>
+
+<!-- Table -->
+<div class="table-wrapper">
+  <div class="table-card">
+    <div class="table-header">
+      <h6>Campaign Performance</h6>
+      <div class="d-flex align-items-center gap-3">
+        <input type="text" class="table-search" id="tableSearch" placeholder="🔍 Search campaigns..." oninput="filterTable()" />
+        <span class="row-count" id="rowCount"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="metricsTable">
+        <thead>
+          <tr>
+            {% if is_admin %}
+            <th onclick="sortTable(0)">Account</th>
+            {% endif %}
+            <th onclick="sortTable({{ 1 if is_admin else 0 }})">Campaign</th>
+            <th onclick="sortTable({{ 2 if is_admin else 1 }})">Impressions</th>
+            <th onclick="sortTable({{ 3 if is_admin else 2 }})">Clicks</th>
+            <th onclick="sortTable({{ 4 if is_admin else 3 }})">CTR</th>
+            <th onclick="sortTable({{ 5 if is_admin else 4 }})">Spend</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="6" class="text-center text-muted py-4">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="text-center">
+    <div class="spinner-border text-primary mb-2" role="status"></div>
+    <div style="color:#555; font-size:0.9rem;">Fetching campaign data...</div>
+  </div>
+</div>
+
+<script>
+  const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+  let allData    = [];
+  let sortCol    = IS_ADMIN ? 2 : 1;   // default sort: impressions
+  let sortDir    = -1;                  // -1 = desc
+
+  // ---------- Date helpers ----------
+  function fmt(d) {
+    return d.toISOString().split('T')[0];
+  }
+  function setPreset(days) {
+    const end   = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    document.getElementById('startDate').value = fmt(start);
+    document.getElementById('endDate').value   = fmt(end);
+    loadData();
+  }
+
+  // ---------- Init dates ----------
+  (function () {
+    const end   = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    document.getElementById('startDate').value = fmt(start);
+    document.getElementById('endDate').value   = fmt(end);
+  })();
+
+  // ---------- Load data ----------
+  function applyFilter() { loadData(); }
+
+  function loadData() {
+    const start = document.getElementById('startDate').value;
+    const end   = document.getElementById('endDate').value;
+    if (!start || !end) return;
+
+    document.getElementById('loadingOverlay').classList.add('active');
+    document.getElementById('errorBanner').style.display = 'none';
+
+    fetch(`/api/metrics?start=${start}&end=${end}`)
+      .then(r => r.json())
+      .then(json => {
+        document.getElementById('loadingOverlay').classList.remove('active');
+        if (json.error) { showError(json.error); return; }
+
+        allData = json.data || [];
+        renderSummary(allData);
+        renderTable(allData);
+        document.getElementById('lastUpdated').textContent =
+          'Updated ' + new Date().toLocaleTimeString();
+
+        if (json.errors && json.errors.length) {
+          showError('Some accounts had errors: ' +
+            json.errors.map(e => e.account_id + ' — ' + e.error).join('; '));
+        }
+      })
+      .catch(err => {
+        document.getElementById('loadingOverlay').classList.remove('active');
+        showError('Network error: ' + err.message);
+      });
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorBanner');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+  }
+
+  // ---------- Summary cards ----------
+  function renderSummary(data) {
+    const totalImp   = data.reduce((s, r) => s + r.impressions, 0);
+    const totalClk   = data.reduce((s, r) => s + r.clicks, 0);
+    const totalCost  = data.reduce((s, r) => s + r.cost, 0);
+    const avgCtr     = totalImp > 0 ? (totalClk / totalImp * 100).toFixed(2) : '0.00';
+    const accounts   = new Set(data.map(r => r.account_id)).size;
+
+    document.getElementById('totalImpressions').textContent = fmtNum(totalImp);
+    document.getElementById('totalClicks').textContent      = fmtNum(totalClk);
+    document.getElementById('avgCtr').textContent           = avgCtr + '%';
+    document.getElementById('totalCost').textContent        = '$' + fmtNum(totalCost.toFixed(2));
+    document.getElementById('totalCampaigns').textContent   = data.length;
+    if (IS_ADMIN) document.getElementById('totalAccounts').textContent = accounts;
+  }
+
+  // ---------- Table render ----------
+  function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+    const search = document.getElementById('tableSearch').value.toLowerCase();
+    const filtered = data.filter(r =>
+      r.campaign_name.toLowerCase().includes(search) ||
+      r.account_id.includes(search)
+    );
+
+    document.getElementById('rowCount').textContent = filtered.length + ' campaigns';
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No campaigns found.</td></tr>`;
+      return;
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      const cols = IS_ADMIN
+        ? ['account_id','campaign_name','impressions','clicks','ctr','cost']
+        : ['campaign_name','impressions','clicks','ctr','cost'];
+      const key = cols[sortCol];
+      return (a[key] > b[key] ? 1 : -1) * sortDir;
+    });
+
+    const maxImp = Math.max(...sorted.map(r => r.impressions), 1);
+
+    tbody.innerHTML = sorted.map(r => {
+      const ctrPct  = Math.min(r.ctr * 2, 100);   // scale bar: 5% CTR = full bar
+      const adminCell = IS_ADMIN
+        ? `<td><span class="account-badge">${r.account_id}</span></td>` : '';
+      return `
+        <tr>
+          ${adminCell}
+          <td>${esc(r.campaign_name)}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="background:#e8f0fe;border-radius:4px;height:6px;width:${Math.round(r.impressions/maxImp*80)}px;min-width:4px;"></div>
+              ${fmtNum(r.impressions)}
+            </div>
+          </td>
+          <td>${fmtNum(r.clicks)}</td>
+          <td>
+            <div class="ctr-bar">
+              <div class="bar-bg"><div class="bar-fill" style="width:${ctrPct}%"></div></div>
+              ${r.ctr}%
+            </div>
+          </td>
+          <td>$${r.cost.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    updateSortIndicators();
+  }
+
+  // ---------- Sort ----------
+  function sortTable(col) {
+    if (sortCol === col) sortDir *= -1;
+    else { sortCol = col; sortDir = -1; }
+    renderTable(allData);
+  }
+  function updateSortIndicators() {
+    document.querySelectorAll('thead th').forEach((th, i) => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (i === sortCol) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    });
+  }
+
+  // ---------- Search ----------
+  function filterTable() { renderTable(allData); }
+
+  // ---------- Utils ----------
+  function fmtNum(n) {
+    return Number(n).toLocaleString();
+  }
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ---------- Auto-refresh every 5 minutes ----------
+  loadData();
+  setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
