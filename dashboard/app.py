@@ -122,18 +122,21 @@ def api_metrics():
     manager_id  = session.get("manager_id", "")
 
     # Admin: discover all accessible account IDs dynamically
+    # Returns list of (account_id, manager_id) tuples
     if is_admin:
-        account_ids = _list_all_account_ids()
+        account_tuples = _list_all_account_ids()
+    else:
+        account_tuples = [(aid, manager_id) for aid in (account_ids or [])]
 
-    if not account_ids:
+    if not account_tuples:
         return jsonify({"error": "No accounts found.", "data": []})
 
     all_rows  = []
     errors    = []
 
-    for account_id in account_ids:
+    for account_id, mgr_id in account_tuples:
         try:
-            rows = _fetch_campaign_metrics(account_id, start_date, end_date, manager_id)
+            rows = _fetch_campaign_metrics(account_id, start_date, end_date, mgr_id)
             all_rows.extend(rows)
         except Exception as e:
             logger.error("Error fetching account %s: %s", account_id, e)
@@ -170,13 +173,13 @@ def _list_all_account_ids():
         resource_names = resp.json().get("resourceNames", [])
         top_level_ids  = [format_customer_id(r.split("/")[-1]) for r in resource_names]
 
-        final_ids = []
-        seen      = set()
+        # list of (account_id, manager_id) tuples
+        final_accounts = []
+        seen           = set()
 
         for cid in top_level_ids:
             if cid in seen:
                 continue
-            # Check if this is a manager account
             try:
                 result = execute_gaql(cid, "SELECT customer.manager FROM customer")
                 is_mgr = bool(result.get("results", [{}])[0].get("customer", {}).get("manager", False))
@@ -184,7 +187,6 @@ def _list_all_account_ids():
                 is_mgr = False
 
             if is_mgr:
-                # Query sub-accounts under this MCC
                 sub_query = (
                     "SELECT customer_client.id, customer_client.manager "
                     "FROM customer_client WHERE customer_client.level > 0"
@@ -196,17 +198,17 @@ def _list_all_account_ids():
                         sub_id     = format_customer_id(str(client.get("id", "")))
                         sub_is_mgr = bool(client.get("manager", False))
                         if sub_id and sub_id not in seen and not sub_is_mgr:
-                            final_ids.append(sub_id)
+                            final_accounts.append((sub_id, cid))  # (account, its manager)
                             seen.add(sub_id)
                 except Exception as e:
                     logger.error("Error fetching sub-accounts for %s: %s", cid, e)
             else:
                 if cid not in seen:
-                    final_ids.append(cid)
+                    final_accounts.append((cid, ""))
                     seen.add(cid)
 
-        logger.info("Resolved %d non-manager account(s): %s", len(final_ids), final_ids)
-        return final_ids
+        logger.info("Resolved %d non-manager account(s): %s", len(final_accounts), final_accounts)
+        return final_accounts
 
     except Exception as e:
         logger.error("Error listing accounts: %s", e)
