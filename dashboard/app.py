@@ -15,19 +15,13 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-from oauth.google_auth import execute_gaql, format_customer_id, get_headers_with_auto_token
-from users import USERS
-
 # ---------------------------------------------------------------------------
-# Railway / production credential setup
-# On Railway, store your token JSON as env vars instead of files.
+# Production credential setup — MUST run before importing oauth.google_auth
+# because google_auth reads GOOGLE_ADS_OAUTH_CONFIG_PATH at module level.
 # ---------------------------------------------------------------------------
 
 def _setup_credentials_from_env():
-    """
-    If running on Railway (or any server), write credentials from env vars
-    to temp files so the OAuth library can find them.
-    """
+    """Write credentials from env vars to temp files so the OAuth library can find them."""
     secret_json = os.environ.get("GOOGLE_ADS_CLIENT_SECRET_JSON")
     token_json  = os.environ.get("GOOGLE_ADS_TOKEN_JSON")
 
@@ -39,13 +33,15 @@ def _setup_credentials_from_env():
         tmp.close()
         os.environ["GOOGLE_ADS_OAUTH_CONFIG_PATH"] = tmp.name
 
-        # Write token next to the secret file so google_auth.py finds it
         if token_json:
             token_path = os.path.join(os.path.dirname(tmp.name), "google_ads_token.json")
             with open(token_path, "w") as f:
                 f.write(token_json)
 
 _setup_credentials_from_env()
+
+from oauth.google_auth import execute_gaql, format_customer_id, get_headers_with_auto_token
+from users import USERS
 
 # ---------------------------------------------------------------------------
 # App setup

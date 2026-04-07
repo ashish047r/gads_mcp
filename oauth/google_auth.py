@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 SCOPES = ['https://www.googleapis.com/auth/adwords']
 API_VERSION = "v20"
 
-GOOGLE_ADS_OAUTH_CONFIG_PATH = os.environ.get("GOOGLE_ADS_OAUTH_CONFIG_PATH")
 GOOGLE_ADS_DEVELOPER_TOKEN = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN")
 
 
@@ -40,6 +39,9 @@ def get_oauth_credentials() -> Credentials:
     Return valid OAuth credentials, running the browser auth flow if needed.
     Tokens are cached next to the OAuth config file as google_ads_token.json.
     """
+    # Read fresh from env each call so server-side setup via env vars is picked up
+    GOOGLE_ADS_OAUTH_CONFIG_PATH = os.environ.get("GOOGLE_ADS_OAUTH_CONFIG_PATH")
+
     if not GOOGLE_ADS_OAUTH_CONFIG_PATH:
         raise ValueError(
             "GOOGLE_ADS_OAUTH_CONFIG_PATH is not set. "
