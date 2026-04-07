@@ -156,7 +156,10 @@ def api_metrics():
 # ---------------------------------------------------------------------------
 
 def _list_all_account_ids():
-    """Return all accessible customer IDs (flat list) for the admin user."""
+    """
+    Return all non-manager customer IDs accessible to the authenticated user.
+    For manager (MCC) accounts, fetches sub-accounts instead.
+    """
     try:
         headers = get_headers_with_auto_token()
         url     = "https://googleads.googleapis.com/v20/customers:listAccessibleCustomers"
@@ -165,7 +168,46 @@ def _list_all_account_ids():
             logger.error("listAccessibleCustomers failed: %s", resp.text)
             return []
         resource_names = resp.json().get("resourceNames", [])
-        return [format_customer_id(r.split("/")[-1]) for r in resource_names]
+        top_level_ids  = [format_customer_id(r.split("/")[-1]) for r in resource_names]
+
+        final_ids = []
+        seen      = set()
+
+        for cid in top_level_ids:
+            if cid in seen:
+                continue
+            # Check if this is a manager account
+            try:
+                result = execute_gaql(cid, "SELECT customer.manager FROM customer")
+                is_mgr = bool(result.get("results", [{}])[0].get("customer", {}).get("manager", False))
+            except Exception:
+                is_mgr = False
+
+            if is_mgr:
+                # Query sub-accounts under this MCC
+                sub_query = (
+                    "SELECT customer_client.id, customer_client.manager "
+                    "FROM customer_client WHERE customer_client.level > 0"
+                )
+                try:
+                    sub_result = execute_gaql(cid, sub_query, manager_id=cid)
+                    for row in sub_result.get("results", []):
+                        client     = row.get("customerClient", {}) or row.get("customer_client", {})
+                        sub_id     = format_customer_id(str(client.get("id", "")))
+                        sub_is_mgr = bool(client.get("manager", False))
+                        if sub_id and sub_id not in seen and not sub_is_mgr:
+                            final_ids.append(sub_id)
+                            seen.add(sub_id)
+                except Exception as e:
+                    logger.error("Error fetching sub-accounts for %s: %s", cid, e)
+            else:
+                if cid not in seen:
+                    final_ids.append(cid)
+                    seen.add(cid)
+
+        logger.info("Resolved %d non-manager account(s): %s", len(final_ids), final_ids)
+        return final_ids
+
     except Exception as e:
         logger.error("Error listing accounts: %s", e)
         return []
